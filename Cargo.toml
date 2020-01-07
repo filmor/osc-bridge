@@ -1,0 +1,19 @@
+[package]
+name = "ocs-bridge"
+version = "0.1.0"
+authors = ["Benedikt Reinartz <filmor@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = "2.33"
+rosc = "0.3"
+tokio = { version = "0.2", features = ["full"] }
+trust-dns-resolver = { version = "0.18", features = ["mdns"] }
+get_if_addrs = "0.5"
+log = "0.4"
+pretty_env_logger = "0.3"
+tokio-util = { version = "0.2", features = ["udp", "codec"] }
+bytes = "0.5"
+futures = "0.3"

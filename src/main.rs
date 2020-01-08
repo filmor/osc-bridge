@@ -1,4 +1,5 @@
 mod codec;
+mod sync;
 mod osc_device;
 
 use futures::StreamExt;
@@ -25,4 +26,10 @@ async fn main() {
         .await;
 
     log::info!("Sent subscribe message");
+
+    let mut sync = sync::Sync::new();
+
+    sync.update(sync::Left, 0.0);
+    sync.update(sync::Right, 0.0);
+    
 }

@@ -1,5 +1,4 @@
 use crate::codec::OscCodec;
-use bytes::BytesMut;
 use futures::stream::{FuturesUnordered, StreamExt};
 use futures::{SinkExt, Stream};
 use get_if_addrs::{get_if_addrs, IfAddr};
@@ -26,6 +25,10 @@ impl OscDevice {
         let msg = OscPacket::Message(msg);
 
         let _res = self.framed.send((msg, self.dest)).await;
+    }
+
+    pub async fn receive_msg(&mut self) -> Option<OscPacket> {
+        self.framed.next().await?.ok().map(|(packet, _addr)| packet)
     }
 }
 
@@ -75,9 +78,8 @@ async fn request_initial_info(addr: Ipv4Addr, bc_addr: Ipv4Addr) -> Result<OscDe
 
     socket.send_to(buf, (bc_addr, port)).await?;
 
-    let mut buf = BytesMut::new();
+    let mut buf = vec![0; 256];
     let (_, src) = socket.recv_from(&mut buf).await?;
-    // TODO: Loop for a while to see whether we get more
 
     let res = decoder::decode(&buf).unwrap();
     log::info!("Message: {:?}", res);

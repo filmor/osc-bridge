@@ -20,6 +20,9 @@ async fn main() {
     let mut right_device: osc_device::OscDevice =
         Box::pin(osc_device::discover_xr18()).next().await.unwrap();
 
+    // TODO: Renew subscriptions after ~9s
+    // TODO: Synchronise value
+
     let left_channel = "08";
     let right_channel = "07";
     left_device

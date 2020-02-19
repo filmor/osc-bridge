@@ -1,5 +1,5 @@
 [package]
-name = "ocs-bridge"
+name = "osc-bridge"
 version = "0.1.0"
 authors = ["Benedikt Reinartz <filmor@gmail.com>"]
 edition = "2018"

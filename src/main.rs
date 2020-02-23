@@ -1,12 +1,14 @@
 mod codec;
+mod discovery;
 mod sync;
 mod osc_device;
 
 use futures::{StreamExt, FutureExt};
 use log;
 use pretty_env_logger;
-use rosc::{OscType, OscMessage, OscPacket::*};
+use rosc::{OscType, OscPacket::*};
 use std::time::Duration;
+use crate::discovery::{connect_ds100, discover_xair};
 
 #[tokio::main]
 async fn main() {
@@ -16,11 +18,11 @@ async fn main() {
     pretty_env_logger::init_timed();
 
     let mut left_device: osc_device::OscDevice =
-        Box::pin(osc_device::discover_xr18()).next().await.unwrap();
+        Box::pin(discover_xair()).next().await.unwrap();
 
     // 192.168.1.104 50000
     let ip_ds100 = std::net::Ipv4Addr::new(192, 168, 1, 104);
-    let mut right_device = Box::pin(osc_device::connect_ds100(ip_ds100)).next().await.unwrap();
+    let mut right_device = Box::pin(connect_ds100(ip_ds100)).next().await.unwrap();
 
     // TODO: Renew subscriptions after ~9s
     // TODO: Synchronise value
@@ -55,6 +57,7 @@ async fn main() {
                     }
 
                     // /dbaudio1/positioning/source_position_x/1
+		    // /dbaudio1/matrixinput/reverbsendgain/ Kanal float
                 }
                 r = right_device.receive_msg().fuse() => {
                     log::info!("Right message: {:?}", r);

@@ -4,6 +4,7 @@ mod sync;
 mod osc_device;
 
 use futures::{StreamExt, FutureExt};
+// use futures_util::pin_mut;
 use log;
 use pretty_env_logger;
 use rosc::{OscType, OscPacket::*};
@@ -24,7 +25,6 @@ async fn main() {
     let ip_ds100 = std::net::Ipv4Addr::new(192, 168, 1, 104);
     let mut right_device = Box::pin(connect_ds100(ip_ds100)).next().await.unwrap();
 
-    // TODO: Renew subscriptions after ~9s
     // TODO: Synchronise value
 
     let mut resubscribe = tokio::time::interval(Duration::from_secs(9));

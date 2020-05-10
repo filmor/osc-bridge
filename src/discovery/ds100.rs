@@ -27,6 +27,13 @@ pub fn connect_ds100(addr: Ipv4Addr) -> impl Stream<Item = OscDevice> {
     })
 }
 
+// pub fn discover_ds100() -> impl Stream<Item = OscDevice> {
+//     let stream = mdns::discover::all("_osc._udp", Duration::from_secs(15)).unwrap().listen();
+
+//     stream.map(|x| {
+//     })
+// }
+
 async fn request_ds100_device_name(addr: Ipv4Addr, out: Ipv4Addr) -> Option<OscDevice> {
     let send = 50010;
     let recv = 50011;

@@ -11,11 +11,10 @@ impl OscCodec {
     }
 }
 
-impl Encoder for OscCodec {
-    type Item = OscPacket;
+impl Encoder<OscPacket> for OscCodec {
     type Error = io::Error;
 
-    fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, msg: OscPacket, buf: &mut BytesMut) -> Result<(), Self::Error> {
         match encode(&msg) {
             Ok(out) => {
                 buf.extend_from_slice(&out);

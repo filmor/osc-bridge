@@ -42,7 +42,7 @@ async fn request_ds100_device_name(addr: Ipv4Addr, out: Ipv4Addr) -> Option<OscD
 
     let socket = UdpSocket::bind((addr, recv)).await.ok()?;
 
-    let mut res = OscDevice::new(socket, (out, send).into());
+    let res = OscDevice::new(socket, (out, send).into());
     res.send_msg("/dbaudio1/settings/devicename", vec![]).await;
 
     let received = res.receive_msg().await;

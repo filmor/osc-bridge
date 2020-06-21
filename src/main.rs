@@ -18,11 +18,11 @@ async fn main() {
     }
     pretty_env_logger::init_timed();
 
-    let mut left_device: osc_device::OscDevice = Box::pin(discover_xair()).next().await.unwrap();
+    let left_device: osc_device::OscDevice = Box::pin(discover_xair()).next().await.unwrap();
 
     // 192.168.1.104 50000
     let ip_ds100 = std::net::Ipv4Addr::new(192, 168, 1, 104);
-    let mut right_device = Box::pin(connect_ds100(ip_ds100)).next().await.unwrap();
+    let right_device = Box::pin(connect_ds100(ip_ds100)).next().await.unwrap();
 
     // TODO: Synchronise value
 

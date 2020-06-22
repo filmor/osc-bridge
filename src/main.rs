@@ -7,6 +7,7 @@ use futures::{FutureExt, StreamExt};
 // use futures_util::pin_mut;
 use crate::discovery::{connect_ds100, discover_xair};
 use log;
+use osc_device::OscDevice;
 use pretty_env_logger;
 use rosc::{OscPacket::*, OscType};
 use std::time::Duration;
@@ -18,18 +19,20 @@ async fn main() {
     }
     pretty_env_logger::init_timed();
 
-    let left_device: osc_device::OscDevice = Box::pin(discover_xair()).next().await.unwrap();
+    let mut left_device: OscDevice = Box::pin(discover_xair()).next().await.unwrap();
+    let (mut left_send, mut left_recv) = left_device.connect();
 
     // 192.168.1.104 50000
     let ip_ds100 = std::net::Ipv4Addr::new(192, 168, 1, 104);
-    let right_device = Box::pin(connect_ds100(ip_ds100)).next().await.unwrap();
+    let mut right_device: OscDevice = Box::pin(connect_ds100(ip_ds100)).next().await.unwrap();
+    let (mut right_send, mut right_recv) = right_device.connect();
 
     // TODO: Synchronise value
 
     let mut resubscribe = tokio::time::interval(Duration::from_secs(9));
 
     let left_channel = "08";
-    left_device
+    left_send
         .send_msg(
             "/subscribe",
             vec![OscType::String(format!("/ch/{}/mix/pan", left_channel))],
@@ -45,25 +48,25 @@ async fn main() {
 
     let fut = tokio::spawn(async move {
         loop {
-            futures::select!(
-                l = left_device.receive_msg().fuse() => {
+            tokio::select!(
+                l = left_recv.next() => {
                     log::info!("Left message: {:?}", l);
 
                     if let Some(Message(msg)) = l {
                         // if !msg.addr.starts_with("/ch") { return; }
                         let var = msg.args[0].clone();
-                        right_device.send_msg("/dbaudio1/coordinatemapping/source_position_x/1/1", vec![var]).await;
+                        right_send.send_msg("/dbaudio1/coordinatemapping/source_position_x/1/1", vec![var]).await;
                     }
 
                     // /dbaudio1/positioning/source_position_x/1
             // /dbaudio1/matrixinput/reverbsendgain/ Kanal float
                 }
-                r = right_device.receive_msg().fuse() => {
+                r = right_recv.next() => {
                     log::info!("Right message: {:?}", r);
                 }
-                _ = resubscribe.next().fuse() => {
+                _ = resubscribe.next() => {
                     // log::info!("Timer");
-                    left_device
+                    left_send
                         .send_msg(
                             "/subscribe",
                             vec![OscType::String(format!("/ch/{}/mix/pan", left_channel))],

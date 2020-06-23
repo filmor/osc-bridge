@@ -3,9 +3,8 @@ mod discovery;
 mod osc_device;
 mod sync;
 
-use futures::{FutureExt, StreamExt};
-// use futures_util::pin_mut;
 use crate::discovery::{connect_ds100, discover_xair};
+use futures::StreamExt;
 use log;
 use osc_device::OscDevice;
 use pretty_env_logger;

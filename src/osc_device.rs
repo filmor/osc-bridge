@@ -1,15 +1,10 @@
 use crate::codec::OscCodec;
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
-use futures::{stream, SinkExt, Stream, StreamExt};
+use futures::{SinkExt, StreamExt};
 use rosc::{OscMessage, OscPacket, OscType};
-use std::{
-    net::SocketAddr,
-    pin::Pin,
-    sync::Arc,
-    task::{Context, Poll},
-};
+use std::{net::SocketAddr, pin::Pin};
 use tokio::net::UdpSocket;
-use tokio::sync::Mutex;
+
 use tokio::task::JoinHandle;
 use tokio_util::udp::UdpFramed;
 
@@ -50,7 +45,7 @@ impl OscDevice {
         let source_task = tokio::spawn(async move {
             while let Some(res) = source.next().await {
                 if let Ok((packet, _addr)) = res {
-                    source_send.send(packet);
+                    let _res = source_send.send(packet).await;
                 }
             }
         });

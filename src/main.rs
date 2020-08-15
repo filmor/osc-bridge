@@ -39,6 +39,10 @@ fn main() {
     log::info!("Connecting to WING...");
     let wing = OscDevice::new((wing_local, 2223), (wing_local, 2223))
         .expect("Failed to create UDP socket for WING");
+    
+    for i in 1..=48 {
+        
+    }
 }
 
 fn get_matching_interface(addr: IpAddr, interfaces: &Vec<Interface>) -> Option<IpAddr> {

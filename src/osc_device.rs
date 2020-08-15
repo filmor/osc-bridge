@@ -1,5 +1,5 @@
 use bytes::BytesMut;
-use rosc::{decoder::decode, encoder::encode, OscMessage, OscPacket, OscType};
+use rosc::{decoder::decode, encoder::encode, OscMessage, OscType, OscPacket};
 use std::{
     io,
     net::{IpAddr, SocketAddr, ToSocketAddrs, UdpSocket},
@@ -15,8 +15,8 @@ const BUF_SIZE: usize = 65535;
 pub struct OscDevice {
     send_thread: JoinHandle<()>,
     recv_thread: JoinHandle<()>,
-    send: Sender<OscPacket>,
-    recv: Receiver<OscPacket>,
+    send: Sender<OscMessage>,
+    recv: Receiver<OscMessage>,
 }
 
 impl OscDevice {
@@ -39,12 +39,20 @@ impl OscDevice {
             recv,
         })
     }
+
+    pub fn send(&self, msg: OscMessage) {
+        self.send.send(msg).expect("Failed to send msg");
+    }
+
+    pub fn flush(&self) -> Vec<OscMessage> {
+        self.recv.try_iter().collect()
+    }
 }
 
 fn create_send_thread(
     send_addr: SocketAddr,
     mut recv_addr: SocketAddr,
-) -> Result<(JoinHandle<()>, Sender<OscPacket>), OscDeviceError> {
+) -> Result<(JoinHandle<()>, Sender<OscMessage>), OscDeviceError> {
     recv_addr.set_port(0);
     let sock = UdpSocket::bind(recv_addr)?;
     sock.connect(send_addr)?;
@@ -52,8 +60,8 @@ fn create_send_thread(
     let (tx, rx) = channel();
 
     let thr = thread::spawn(move || loop {
-        if let Ok(ref msg) = rx.recv() {
-            match encode(msg) {
+        if let Ok(msg) = rx.recv() {
+            match encode(&OscPacket::Message(msg)) {
                 Ok(out) => {
                     // TODO: log an error
                     sock.send(&out).unwrap();
@@ -73,7 +81,7 @@ fn create_send_thread(
 fn create_recv_thread(
     send_addr: SocketAddr,
     recv_addr: SocketAddr,
-) -> Result<(JoinHandle<()>, Receiver<OscPacket>), OscDeviceError> {
+) -> Result<(JoinHandle<()>, Receiver<OscMessage>), OscDeviceError> {
     let sock = UdpSocket::bind(recv_addr)?;
     sock.connect(send_addr)?;
 
@@ -85,10 +93,13 @@ fn create_recv_thread(
         loop {
             match sock.recv(&mut buf) {
                 Ok(len) => match decode(&buf[..len]) {
-                    Ok(pkt) => {
-                        if let Err(_) = tx.send(pkt) {
+                    Ok(OscPacket::Message(msg)) => {
+                        if let Err(_) = tx.send(msg) {
                             break;
                         }
+                    }
+                    Ok(OscPacket::Bundle(bdl)) => {
+                        log::error!("Received unexpected bundle: {:?}", bdl)
                     }
                     Err(err) => {
                         log::error!("Failed to decode packet: {:?}", err);

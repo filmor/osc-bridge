@@ -1,14 +1,13 @@
 mod osc_device;
 mod sync;
 
+use get_if_addrs::{get_if_addrs, IfAddr, Interface};
+use ipnetwork::Ipv4Network;
 use log;
 use osc_device::OscDevice;
 use pretty_env_logger;
-use rosc::{OscPacket::*, OscType};
-use std::{net::IpAddr, time::Duration};
-use get_if_addrs::{get_if_addrs, Interface, IfAddr};
-use ipnetwork::{Ipv4Network, Ipv6Network};
 
+use std::net::IpAddr;
 
 fn main() {
     if std::env::var("RUST_LOG").is_err() {
@@ -16,27 +15,48 @@ fn main() {
     }
     pretty_env_logger::init_timed();
 
-    let if_addrs = get_if_addrs().unwrap();
+    let if_addrs = get_if_addrs().expect("Failed to list local network devices");
 
-    let ds100_ip = IpAddr::V4("192.168.178.78".parse().unwrap());
-    let wing_ip = IpAddr::V4("192.168.178.75".parse().unwrap());
+    let ds100_ip = IpAddr::V4(
+        "192.168.178.78"
+            .parse()
+            .expect("Failed to parse DS100 address"),
+    );
+    let wing_ip = IpAddr::V4(
+        "192.168.178.75"
+            .parse()
+            .expect("Failed to parse WING address"),
+    );
 
-    let ds100_local = get_matching_interface(ds100_ip, &if_addrs);
-    let wing_local = get_matching_interface(wing_ip, &if_addrs);
+    let ds100_local = get_matching_interface(ds100_ip, &if_addrs)
+        .expect("Failed to find matching local interface");
+    let wing_local = get_matching_interface(wing_ip, &if_addrs)
+        .expect("Failed to find matching local interface");
 
-    let ds100 = OscDevice::new((ds100_ip, 50010), (ds100_local, 50011));
-    let wing = OscDevice::new((wing_local, 2223), (wing_local, 2223));
+    log::info!("Connecting to DS100...");
+    let ds100 = OscDevice::new((ds100_ip, 50010), (ds100_local, 50011))
+        .expect("Failed to create UDP socket");
+    log::info!("Connecting to WING...");
+    let wing = OscDevice::new((wing_local, 2223), (wing_local, 2223))
+        .expect("Failed to create UDP socket");
+
+
 }
 
-fn get_matching_interface(addr: IpAddr, interfaces: &Vec<Interface>) -> IpAddr {
+fn get_matching_interface(addr: IpAddr, interfaces: &Vec<Interface>) -> Option<IpAddr> {
     match addr {
         IpAddr::V4(addr) => {
             for interface in interfaces.iter() {
                 if let IfAddr::V4(ref if_addr) = interface.addr {
                     if let Ok(net) = Ipv4Network::with_netmask(if_addr.ip, if_addr.netmask) {
                         if net.contains(addr) {
-                            log::info!("Using device '{}' ({}) to connect to {}", interface.name, if_addr.ip, addr);
-                            return IpAddr::V4(if_addr.ip);
+                            log::info!(
+                                "Using device '{}' ({}) to connect to {}",
+                                interface.name,
+                                if_addr.ip,
+                                addr
+                            );
+                            return Some(IpAddr::V4(if_addr.ip));
                         }
                     }
                 }
@@ -48,8 +68,7 @@ fn get_matching_interface(addr: IpAddr, interfaces: &Vec<Interface>) -> IpAddr {
     }
 
     log::error!("No matching local interface found for {}", addr);
-
-    std::process::exit(1);
+    None
 }
 
 /*

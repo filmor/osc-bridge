@@ -1,7 +1,6 @@
 use std::time::{Duration, Instant};
 
 type T = f32;
-const THRESHOLD: Duration = Duration::from_millis(100);
 
 #[derive(Clone)]
 pub struct Sync {
@@ -48,8 +47,8 @@ impl Sync {
 
     pub fn update(&mut self, side: Side, value: T) -> bool {
         match side {
-            Left => do_update(&mut self.left, &self.right, value),
-            Right => do_update(&mut self.right, &self.left, value),
+            Left => self.left.update(value),
+            Right => self.right.update(value),
         }
     }
 
@@ -123,7 +122,7 @@ impl SyncItem {
     }
 
     fn update(&mut self, new_value: T) -> bool {
-        if (self.value - new_value).abs() < 0.01 {
+        if (self.value - new_value).abs() > 0.01 {
             self.value = new_value;
             self.last_update = Some(Instant::now());
             true
@@ -131,14 +130,4 @@ impl SyncItem {
             false
         }
     }
-}
-
-fn do_update(item: &mut SyncItem, other: &SyncItem, value: T) -> bool {
-    if let Some(other) = other.last_update {
-        if other.elapsed() < THRESHOLD {
-            return false;
-        }
-    }
-
-    item.update(value)
 }

@@ -1,5 +1,5 @@
 use bytes::BytesMut;
-use rosc::{decoder::decode, encoder::encode, OscMessage, OscType, OscPacket};
+use rosc::{decoder::decode, encoder::encode, OscMessage, OscPacket, OscType};
 use std::{
     io,
     net::{IpAddr, SocketAddr, ToSocketAddrs, UdpSocket},
@@ -13,8 +13,7 @@ use thread::JoinHandle;
 const BUF_SIZE: usize = 65535;
 
 pub struct OscDevice {
-    send_thread: JoinHandle<()>,
-    recv_thread: JoinHandle<()>,
+    thread: JoinHandle<()>,
     send: Sender<OscMessage>,
     recv: Receiver<OscMessage>,
 }
@@ -27,14 +26,10 @@ impl OscDevice {
         let send_addr = send_addr.into();
         let recv_addr = recv_addr.into();
 
-        log::debug!("Starting receive thread...");
-        let (recv_thread, recv) = create_recv_thread(send_addr, recv_addr)?;
-        log::debug!("Starting send thread...");
-        let (send_thread, send) = create_send_thread(send_addr, recv_addr)?;
+        let (handle, send, recv) = create_thread(send_addr, recv_addr)?;
 
         Ok(OscDevice {
-            send_thread,
-            recv_thread,
+            thread: handle,
             send,
             recv,
         })
@@ -49,70 +44,72 @@ impl OscDevice {
     }
 }
 
-fn create_send_thread(
-    send_addr: SocketAddr,
-    mut recv_addr: SocketAddr,
-) -> Result<(JoinHandle<()>, Sender<OscMessage>), OscDeviceError> {
-    recv_addr.set_port(0);
-    let sock = UdpSocket::bind(recv_addr)?;
-    sock.connect(send_addr)?;
-
-    let (tx, rx) = channel();
-
-    let thr = thread::spawn(move || loop {
-        if let Ok(msg) = rx.recv() {
-            match encode(&OscPacket::Message(msg)) {
-                Ok(out) => {
-                    // TODO: log an error
-                    sock.send(&out).unwrap();
-                }
-                Err(err) => {
-                    log::error!("Failed to encode packet: {:?}", err);
-                }
-            }
-        } else {
-            break;
-        }
-    });
-
-    Ok((thr, tx))
-}
-
-fn create_recv_thread(
+fn create_thread(
     send_addr: SocketAddr,
     recv_addr: SocketAddr,
-) -> Result<(JoinHandle<()>, Receiver<OscMessage>), OscDeviceError> {
+) -> Result<(JoinHandle<()>, Sender<OscMessage>, Receiver<OscMessage>), OscDeviceError> {
     let sock = UdpSocket::bind(recv_addr)?;
     sock.connect(send_addr)?;
+    sock.set_read_timeout(Some(Duration::from_millis(1)))?;
+    log::info!("Awaiting messages from {}", send_addr);
+    log::info!("Listening on {}", sock.local_addr().unwrap());
 
-    let (tx, rx) = channel();
+    let (tx_send, rx_send) = channel();
+    let (tx_recv, rx_recv) = channel();
 
     let thr = thread::spawn(move || {
         let mut buf = vec![0; BUF_SIZE];
 
         loop {
-            match sock.recv(&mut buf) {
-                Ok(len) => match decode(&buf[..len]) {
-                    Ok(OscPacket::Message(msg)) => {
-                        if let Err(_) = tx.send(msg) {
-                            break;
-                        }
-                    }
-                    Ok(OscPacket::Bundle(bdl)) => {
-                        log::error!("Received unexpected bundle: {:?}", bdl)
-                    }
-                    Err(err) => {
-                        log::error!("Failed to decode packet: {:?}", err);
-                    }
-                },
-                Err(err) => {
-                    log::error!("Failed to receive from socket: {:?}", err);
-                }
+            while let Ok(len) = sock.recv(&mut buf) {
+                if !handle_receive(&buf[..len], &tx_recv) {
+                    break;
+                };
             }
+
+            // TODO: Check if rx_send is still valid by doing a single peek
+            match rx_send.recv_timeout(Duration::from_millis(1)) {
+                Ok(_) => {}
+                Err(_) => {}
+            }
+            for msg in rx_send.try_iter() {
+                log::debug!("Sending message {:?}", msg);
+                handle_send(&sock, msg);
+            }
+
+            std::thread::sleep(Duration::from_millis(1));
         }
     });
 
-    Ok((thr, rx))
+    Ok((thr, tx_send, rx_recv))
+}
+
+fn handle_receive(buf: &[u8], tx: &Sender<OscMessage>) -> bool {
+    match decode(buf) {
+        Ok(OscPacket::Message(msg)) => {
+            if let Err(_) = tx.send(msg) {
+                return false;
+            }
+        }
+        Ok(OscPacket::Bundle(bdl)) => log::error!("Received unexpected bundle: {:?}", bdl),
+        Err(err) => {
+            log::error!("Failed to decode packet: {:?}", err);
+        }
+    }
+
+    true
+}
+
+fn handle_send(sock: &UdpSocket, msg: OscMessage) {
+    match encode(&OscPacket::Message(msg)) {
+        Ok(out) => {
+            // TODO: log an error
+            sock.send(&out).unwrap();
+        }
+        Err(err) => {
+            log::error!("Failed to encode packet: {:?}", err);
+        }
+    }
 }
 
 #[derive(Error, Debug)]

@@ -6,8 +6,10 @@ use ipnetwork::Ipv4Network;
 use log;
 use osc_device::OscDevice;
 use pretty_env_logger;
+use regex::{Regex, RegexSet};
 
-use std::net::IpAddr;
+use rosc::OscMessage;
+use std::{collections::HashMap, net::IpAddr, time::Duration};
 
 fn main() {
     if std::env::var("RUST_LOG").is_err() {
@@ -37,11 +39,58 @@ fn main() {
     let ds100 = OscDevice::new((ds100_ip, 50010), (ds100_local, 50011))
         .expect("Failed to create UDP socket for DS100");
     log::info!("Connecting to WING...");
-    let wing = OscDevice::new((wing_local, 2223), (wing_local, 2223))
+    let wing = OscDevice::new((wing_ip, 2223), (wing_local, 0))
         .expect("Failed to create UDP socket for WING");
-    
-    for i in 1..=48 {
-        
+
+    let ds100_regex_set = RegexSet::new(&[
+        r"^/dbaudio1/coordinatemapping/source_position_xy/1/",
+        r"^/dbaudio1/matrixinput/reverbsendgain/",
+        r"^/dbaudio1/reverbinputprocessing/gain/",
+    ])
+    .unwrap();
+
+    let wing_channel_regex = Regex::new(r"^/ch/(\d+)/send/1/(pan|wid|lvl)$").unwrap();
+
+    let wing_bus_regex = Regex::new(r"^/bus/(\d+)/fdr$").unwrap();
+
+    loop {
+        std::thread::sleep(Duration::from_millis(100));
+
+        for msg in ds100.flush() {
+            log::info!("Got DS100 message {:?}", msg);
+            let ds100_matches = ds100_regex_set.matches(&msg.addr);
+
+            if ds100_matches.matched_any() {
+                // map ds100 input
+            }
+        }
+
+        for msg in wing.flush() {
+            log::info!("Got WING message {:?}", msg);
+            if let Some(cap) = wing_channel_regex.captures(&msg.addr) {
+                // map channel input
+
+                continue;
+            }
+
+            if let Some(cap) = wing_bus_regex.captures(&msg.addr) {
+                // map channel input
+
+                continue;
+            }
+        }
+
+        // Send "subscribe"
+        // Process "answers"
+        // Send new settings
+        subscribe_wing(&wing);
+        subscribe_ds100(&ds100);
+    }
+
+    std::thread::sleep(Duration::from_millis(1000));
+
+    for m in wing.flush() {
+        log::info!("{:?}", m);
     }
 }
 
@@ -73,72 +122,37 @@ fn get_matching_interface(addr: IpAddr, interfaces: &Vec<Interface>) -> Option<I
     None
 }
 
-/*
-#[tokio::main]
-async fn main() {
-    if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "info");
+fn empty_msg(addr: String) -> OscMessage {
+    OscMessage {
+        addr,
+        args: Vec::new(),
     }
-    pretty_env_logger::init_timed();
-
-    let mut left_device: OscDevice = Box::pin(discover_xair()).next().await.unwrap();
-    let (mut left_send, mut left_recv) = left_device.connect();
-
-    // 192.168.1.104 50000
-    let ip_ds100 = std::net::Ipv4Addr::new(192, 168, 1, 104);
-    let mut right_device: OscDevice = Box::pin(connect_ds100(ip_ds100)).next().await.unwrap();
-    let (mut right_send, mut right_recv) = right_device.connect();
-
-    // TODO: Synchronise value
-
-    let mut resubscribe = tokio::time::interval(Duration::from_secs(9));
-
-    let left_channel = "08";
-    left_send
-        .send_msg(
-            "/subscribe",
-            vec![OscType::String(format!("/ch/{}/mix/pan", left_channel))],
-        )
-        .await;
-
-    log::info!("Sent subscribe message");
-
-    let mut sync = sync::Sync::new();
-
-    sync.update(sync::Left, 0.0);
-    sync.update(sync::Right, 0.0);
-
-    let fut = tokio::spawn(async move {
-        loop {
-            tokio::select!(
-                l = left_recv.next() => {
-                    log::info!("Left message: {:?}", l);
-
-                    if let Some(Message(msg)) = l {
-                        // if !msg.addr.starts_with("/ch") { return; }
-                        let var = msg.args[0].clone();
-                        right_send.send_msg("/dbaudio1/coordinatemapping/source_position_x/1/1", vec![var]).await;
-                    }
-
-                    // /dbaudio1/positioning/source_position_x/1
-            // /dbaudio1/matrixinput/reverbsendgain/ Kanal float
-                }
-                r = right_recv.next() => {
-                    log::info!("Right message: {:?}", r);
-                }
-                _ = resubscribe.next() => {
-                    // log::info!("Timer");
-                    left_send
-                        .send_msg(
-                            "/subscribe",
-                            vec![OscType::String(format!("/ch/{}/mix/pan", left_channel))],
-                        )
-                        .await;
-                }
-            );
-        }
-    });
-
-    fut.await.unwrap();
 }
-*/
+
+fn subscribe_ds100(device: &OscDevice) {
+    for i in 1..=40 {
+        let addr = format!("/dbaudio1/matrixinput/reverbsendgain/{}", i);
+        device.send(empty_msg(addr));
+        let addr = format!("/dbaudio1/coordinatemapping/source_position_xy/1/{}", i);
+        device.send(empty_msg(addr));
+    }
+
+    for i in 1..=4 {
+        let addr = format!("/dbaudio1/reverbinputprocessing/gain/{}", i);
+        device.send(empty_msg(addr));
+    }
+}
+
+fn subscribe_wing(device: &OscDevice) {
+    for i in 1..=40 {
+        for suffix in &["pan", "wid", "lvl"] {
+            let addr = format!("/ch/{}/send/1/{}", i, suffix);
+            device.send(empty_msg(addr));
+        }
+    }
+
+    for i in 1..=4 {
+        let addr = format!("/bus/{}/fdr", i);
+        device.send(empty_msg(addr));
+    }
+}

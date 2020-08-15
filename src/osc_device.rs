@@ -27,10 +27,10 @@ impl OscDevice {
         let send_addr = send_addr.into();
         let recv_addr = recv_addr.into();
 
-        log::info!("Starting receive thread...");
+        log::debug!("Starting receive thread...");
         let (recv_thread, recv) = create_recv_thread(send_addr, recv_addr)?;
-        log::info!("Starting send thread...");
-        let (send_thread, send) = create_send_thread(recv_addr, send_addr)?;
+        log::debug!("Starting send thread...");
+        let (send_thread, send) = create_send_thread(send_addr, recv_addr)?;
 
         Ok(OscDevice {
             send_thread,

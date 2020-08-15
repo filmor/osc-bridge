@@ -39,6 +39,14 @@ impl Sync {
         }
     }
 
+    pub fn left_value(&self) -> T {
+        self.left.value
+    }
+
+    pub fn right_value(&self) -> T {
+        self.right.value
+    }
+
     pub fn values(&self) -> (T, T) {
         (self.left.value, self.right.value)
     }

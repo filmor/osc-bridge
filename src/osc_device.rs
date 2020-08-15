@@ -68,10 +68,10 @@ fn create_thread(
             }
 
             // TODO: Check if rx_send is still valid by doing a single peek
-            match rx_send.recv_timeout(Duration::from_millis(1)) {
+            /* match rx_send.recv_timeout(Duration::from_millis(1)) {
                 Ok(_) => {}
                 Err(_) => {}
-            }
+            } */
             for msg in rx_send.try_iter() {
                 log::debug!("Sending message {:?}", msg);
                 handle_send(&sock, msg);
@@ -88,6 +88,7 @@ fn handle_receive(buf: &[u8], tx: &Sender<OscMessage>) -> bool {
     match decode(buf) {
         Ok(OscPacket::Message(msg)) => {
             if let Err(_) = tx.send(msg) {
+                log::info!("Failed to forward message, stopping thread");
                 return false;
             }
         }

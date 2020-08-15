@@ -137,6 +137,14 @@ fn main() {
             }
         }
 
+        log::info!(
+            "DS100: ({}, {})\tWING: ({}, {})",
+            x_positions[0].left_value(),
+            y_positions[0].left_value(),
+            x_positions[0].right_value(),
+            y_positions[0].right_value(),
+        );
+
         /* for s in x_positions.iter() {
             log::info!("Value: {:?}", s.values());
         } */
@@ -144,12 +152,6 @@ fn main() {
         // Send new settings
         subscribe_wing(&wing);
         subscribe_ds100(&ds100);
-    }
-
-    std::thread::sleep(Duration::from_millis(1000));
-
-    for m in wing.flush() {
-        log::info!("{:?}", m);
     }
 }
 

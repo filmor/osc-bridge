@@ -60,6 +60,9 @@ fn main() {
 
     let mut reverb_gains = vec![Sync::new(); 40];
 
+    subscribe_wing(&wing);
+    subscribe_ds100(&ds100);
+
     loop {
         std::thread::sleep(Duration::from_millis(100));
 
@@ -149,6 +152,69 @@ fn main() {
             log::info!("Value: {:?}", s.values());
         } */
 
+        for i in 0..40 {
+            let n = i + 1;
+
+            match x_positions[i].flush() {
+                Some((value, Side::Left)) => {
+                    let addr = format!("/dbaudio1/coordinatemapping/source_position_x/1/{}", n);
+                    let args = vec![OscType::Float(value)];
+                    ds100.send(OscMessage { addr, args });
+                }
+                Some((value, Side::Right)) => {
+                    let addr = format!("/ch/{}/send/1/pan", n);
+                    let args = vec![OscType::Float(value)];
+                    wing.send(OscMessage { addr, args });
+                }
+                _ => {}
+            }
+
+            match y_positions[i].flush() {
+                Some((value, Side::Left)) => {
+                    let addr = format!("/dbaudio1/coordinatemapping/source_position_y/1/{}", n);
+                    let args = vec![OscType::Float(value)];
+                    ds100.send(OscMessage { addr, args });
+                }
+                Some((value, Side::Right)) => {
+                    let addr = format!("/ch/{}/send/1/wid", n);
+                    let args = vec![OscType::Float(value)];
+                    wing.send(OscMessage { addr, args });
+                }
+                _ => {}
+            }
+
+            match gains[i].flush() {
+                Some((value, Side::Left)) => {
+                    let addr = format!("/dbaudio1/matrixinput/reverbsendgain/{}", n);
+                    let args = vec![OscType::Float(value)];
+                    ds100.send(OscMessage { addr, args });
+                }
+                Some((value, Side::Right)) => {
+                    let addr = format!("/ch/{}/send/1/lvl", n);
+                    let args = vec![OscType::Float(value)];
+                    wing.send(OscMessage { addr, args });
+                }
+                _ => {}
+            }
+        }
+
+        for i in 0..4 {
+            let n = i + 1;
+            match reverb_gains[i].flush() {
+                Some((value, Side::Left)) => {
+                    let addr = format!("/dbaudio1/reverbinputprocessing/gain/{}", n);
+                    let args = vec![OscType::Float(value)];
+                    ds100.send(OscMessage { addr, args });
+                }
+                Some((value, Side::Right)) => {
+                    let addr = format!("/bus/{}/fdr", n);
+                    let args = vec![OscType::Float(value)];
+                    wing.send(OscMessage { addr, args });
+                }
+                _ => {}
+            }
+        }
+        
         // Send new settings
         subscribe_wing(&wing);
         subscribe_ds100(&ds100);

@@ -1,16 +1,58 @@
-mod codec;
-mod discovery;
 mod osc_device;
 mod sync;
 
-use crate::discovery::{connect_ds100, discover_xair};
-use futures::StreamExt;
 use log;
 use osc_device::OscDevice;
 use pretty_env_logger;
 use rosc::{OscPacket::*, OscType};
-use std::time::Duration;
+use std::{net::IpAddr, time::Duration};
+use get_if_addrs::{get_if_addrs, Interface, IfAddr};
+use ipnetwork::{Ipv4Network, Ipv6Network};
 
+
+fn main() {
+    if std::env::var("RUST_LOG").is_err() {
+        std::env::set_var("RUST_LOG", "info");
+    }
+    pretty_env_logger::init_timed();
+
+    let if_addrs = get_if_addrs().unwrap();
+
+    let ds100_ip = IpAddr::V4("192.168.178.78".parse().unwrap());
+    let wing_ip = IpAddr::V4("192.168.178.75".parse().unwrap());
+
+    let ds100_local = get_matching_interface(ds100_ip, &if_addrs);
+    let wing_local = get_matching_interface(wing_ip, &if_addrs);
+
+    let ds100 = OscDevice::new((ds100_ip, 50010), (ds100_local, 50011));
+    let wing = OscDevice::new((wing_local, 2223), (wing_local, 2223));
+}
+
+fn get_matching_interface(addr: IpAddr, interfaces: &Vec<Interface>) -> IpAddr {
+    match addr {
+        IpAddr::V4(addr) => {
+            for interface in interfaces.iter() {
+                if let IfAddr::V4(ref if_addr) = interface.addr {
+                    if let Ok(net) = Ipv4Network::with_netmask(if_addr.ip, if_addr.netmask) {
+                        if net.contains(addr) {
+                            log::info!("Using device '{}' ({}) to connect to {}", interface.name, if_addr.ip, addr);
+                            return IpAddr::V4(if_addr.ip);
+                        }
+                    }
+                }
+            }
+        }
+        IpAddr::V6(addr) => {
+            unimplemented!("IPv6 is not supported");
+        }
+    }
+
+    log::error!("No matching local interface found for {}", addr);
+
+    std::process::exit(1);
+}
+
+/*
 #[tokio::main]
 async fn main() {
     if std::env::var("RUST_LOG").is_err() {
@@ -78,3 +120,4 @@ async fn main() {
 
     fut.await.unwrap();
 }
+*/

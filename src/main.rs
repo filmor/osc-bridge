@@ -7,8 +7,9 @@ use log;
 use osc_device::OscDevice;
 use pretty_env_logger;
 use regex::{Regex, RegexSet};
+use sync::{Side, Sync};
 
-use rosc::OscMessage;
+use rosc::{OscMessage, OscType};
 use std::{collections::HashMap, net::IpAddr, time::Duration};
 
 fn main() {
@@ -53,35 +54,93 @@ fn main() {
 
     let wing_bus_regex = Regex::new(r"^/bus/(\d+)/fdr$").unwrap();
 
+    let mut x_positions = vec![Sync::new(); 40];
+    let mut y_positions = vec![Sync::new(); 40];
+    let mut gains = vec![Sync::new(); 40];
+
+    let mut reverb_gains = vec![Sync::new(); 40];
+
     loop {
         std::thread::sleep(Duration::from_millis(100));
 
         for msg in ds100.flush() {
-            log::info!("Got DS100 message {:?}", msg);
+            log::debug!("Got DS100 message {:?}", msg);
             let ds100_matches = ds100_regex_set.matches(&msg.addr);
 
             if ds100_matches.matched_any() {
-                // map ds100 input
+                let n: usize = msg.addr.rsplit('/').next().unwrap().parse().unwrap();
+
+                match ds100_matches.iter().next().unwrap() {
+                    0 => {
+                        if let OscType::Float(x) = msg.args[0] {
+                            x_positions[n - 1].update(Side::Left, x);
+                        }
+                        if let OscType::Float(y) = msg.args[1] {
+                            y_positions[n - 1].update(Side::Left, y);
+                        }
+                    }
+
+                    1 => {
+                        if let OscType::Float(gain) = msg.args[0] {
+                            gains[n - 1].update(Side::Left, gain);
+                        }
+                    }
+
+                    2 => {
+                        if let OscType::Float(revgain) = msg.args[0] {
+                            reverb_gains[n - 1].update(Side::Left, revgain);
+                        }
+                    }
+
+                    _ => {}
+                }
             }
         }
 
         for msg in wing.flush() {
-            log::info!("Got WING message {:?}", msg);
+            log::debug!("Got WING message {:?}", msg);
             if let Some(cap) = wing_channel_regex.captures(&msg.addr) {
                 // map channel input
+
+                let n: usize = cap[1].parse().unwrap();
+
+                match &cap[2] {
+                    "pan" => {
+                        if let OscType::Float(x) = msg.args[2] {
+                            x_positions[n - 1].update(Side::Right, x);
+                        }
+                    }
+                    "wid" => {
+                        if let OscType::Float(x) = msg.args[2] {
+                            y_positions[n - 1].update(Side::Right, x);
+                        }
+                    }
+                    "lvl" => {
+                        if let OscType::Float(x) = msg.args[2] {
+                            gains[n - 1].update(Side::Right, x);
+                        }
+                    }
+                    _ => {}
+                }
 
                 continue;
             }
 
             if let Some(cap) = wing_bus_regex.captures(&msg.addr) {
                 // map channel input
+                let n: usize = cap[1].parse().unwrap();
+                if let OscType::Float(x) = msg.args[2] {
+                    reverb_gains[n - 1].update(Side::Right, x);
+                }
 
                 continue;
             }
         }
 
-        // Send "subscribe"
-        // Process "answers"
+        /* for s in x_positions.iter() {
+            log::info!("Value: {:?}", s.values());
+        } */
+
         // Send new settings
         subscribe_wing(&wing);
         subscribe_ds100(&ds100);

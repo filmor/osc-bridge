@@ -1,8 +1,9 @@
 use std::time::{Duration, Instant};
 
-type T = f64;
+type T = f32;
 const THRESHOLD: Duration = Duration::from_millis(100);
 
+#[derive(Clone)]
 pub struct Sync {
     left: SyncItem,
     right: SyncItem,
@@ -17,10 +18,10 @@ pub enum Side {
 
 pub use Side::*;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct SyncItem {
     last_update: Option<Instant>,
-    value: f64,
+    value: T,
 }
 
 impl Sync {
@@ -37,6 +38,10 @@ impl Sync {
             Right => do_update(&mut self.right, &self.left, value),
         }
     }
+
+    pub fn values(&self) -> (T, T) {
+        (self.left.value, self.right.value)
+    }
 }
 
 impl SyncItem {
@@ -47,7 +52,7 @@ impl SyncItem {
         }
     }
 
-    fn update(&mut self, new_value: f64) -> bool {
+    fn update(&mut self, new_value: T) -> bool {
         if self.value != new_value {
             self.value = new_value;
             self.last_update = Some(Instant::now());

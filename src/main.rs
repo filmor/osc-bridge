@@ -141,16 +141,13 @@ fn main() {
         }
 
         log::info!(
-            "DS100: ({}, {})\tWING: ({}, {})",
-            x_positions[0].left_value(),
-            y_positions[0].left_value(),
-            x_positions[0].right_value(),
-            y_positions[0].right_value(),
+            "DS100: ({}, {})\tWING: ({}, {})\tMaster: {:?}",
+            x_positions[0].left_value() as i32,
+            y_positions[0].left_value() as i32,
+            x_positions[0].right_value() as i32,
+            y_positions[0].right_value() as i32,
+            x_positions[0].current_master(),
         );
-
-        /* for s in x_positions.iter() {
-            log::info!("Value: {:?}", s.values());
-        } */
 
         for i in 0..40 {
             let n = i + 1;
@@ -159,15 +156,19 @@ fn main() {
                 Some((value, Side::Left)) => {
                     let addr = format!("/dbaudio1/coordinatemapping/source_position_x/1/{}", n);
                     let args = vec![OscType::Float(value)];
+                    log::info!("Sending {:?}", OscMessage { addr: addr.clone(), args: args.clone() });
                     ds100.send(OscMessage { addr, args });
                 }
                 Some((value, Side::Right)) => {
                     let addr = format!("/ch/{}/send/1/pan", n);
                     let args = vec![OscType::Float(value)];
+                    log::info!("Sending {:?}", OscMessage { addr: addr.clone(), args: args.clone() });
                     wing.send(OscMessage { addr, args });
                 }
                 _ => {}
             }
+
+            // if i == 0 { break; }
 
             match y_positions[i].flush() {
                 Some((value, Side::Left)) => {
@@ -240,7 +241,7 @@ fn get_matching_interface(addr: IpAddr, interfaces: &Vec<Interface>) -> Option<I
                 }
             }
         }
-        IpAddr::V6(addr) => {
+        IpAddr::V6(_addr) => {
             unimplemented!("IPv6 is not supported");
         }
     }

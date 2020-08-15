@@ -13,7 +13,7 @@ pub struct Sync {
     // r2l: Box<dyn Fn(T) -> T>,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum Side {
     Left,
     Right,
@@ -61,12 +61,8 @@ impl Sync {
         self.right.value
     }
 
-    pub fn left_last_update(&self) -> Option<Instant> {
-        self.left.last_update
-    }
-
-    pub fn right_last_update(&self) -> Option<Instant> {
-        self.right.last_update
+    pub fn current_master(&self) -> Option<Side> {
+        self.current_master
     }
 
     pub fn flush(&mut self) -> Option<(T, Side)> {
@@ -76,15 +72,18 @@ impl Sync {
         self.last_flush = Some(now);
 
         match self.current_master {
+            // TODO: Handle unsynchronised case! (Every minute from Left -> RIght)
             Some(master) => {
                 let item = self.get_item(master);
 
                 if item.last_update < Some(threshold) {
+                    // log::info!("Last update: {:?} < threshold {:?}, resetting", item.last_update, threshold);
                     self.current_master = None;
                     return None;
                 }
 
                 if item.last_update > prev_flush {
+                    // log::info!("Last update: {:?} > prev_flush {:?}, sending {} to {:?}", item.last_update, threshold, item.value, master.flip());
                     return Some((item.value, master.flip()));
                 }
             }
@@ -97,9 +96,7 @@ impl Sync {
                 let item = self.get_item(side);
                 let value = item.value;
 
-                if item.last_update < Some(threshold) {
-                    return None;
-                } else {
+                if item.last_update > prev_flush {
                     self.current_master = Some(side);
                     return Some((value, side.flip()));
                 }

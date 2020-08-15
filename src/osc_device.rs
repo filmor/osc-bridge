@@ -1,9 +1,8 @@
-use bytes::BytesMut;
-use rosc::{decoder::decode, encoder::encode, OscMessage, OscPacket, OscType};
+use rosc::{decoder::decode, encoder::encode, OscMessage, OscPacket};
 use std::{
     io,
-    net::{IpAddr, SocketAddr, ToSocketAddrs, UdpSocket},
-    sync::mpsc::{channel, Receiver, Sender, SyncSender},
+    net::{SocketAddr, UdpSocket},
+    sync::mpsc::{channel, Receiver, Sender},
     thread,
     time::Duration,
 };
@@ -13,7 +12,7 @@ use thread::JoinHandle;
 const BUF_SIZE: usize = 65535;
 
 pub struct OscDevice {
-    thread: JoinHandle<()>,
+    _thread: JoinHandle<()>,
     send: Sender<OscMessage>,
     recv: Receiver<OscMessage>,
 }
@@ -29,7 +28,7 @@ impl OscDevice {
         let (handle, send, recv) = create_thread(send_addr, recv_addr)?;
 
         Ok(OscDevice {
-            thread: handle,
+            _thread: handle,
             send,
             recv,
         })
@@ -87,7 +86,7 @@ fn create_thread(
 fn handle_receive(buf: &[u8], tx: &Sender<OscMessage>) -> bool {
     match decode(buf) {
         Ok(OscPacket::Message(msg)) => {
-            if let Err(_) = tx.send(msg) {
+            if tx.send(msg).is_err() {
                 log::info!("Failed to forward message, stopping thread");
                 return false;
             }

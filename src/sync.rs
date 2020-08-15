@@ -123,7 +123,7 @@ impl SyncItem {
     }
 
     fn update(&mut self, new_value: T) -> bool {
-        if self.value != new_value {
+        if (self.value - new_value).abs() < 0.01 {
             self.value = new_value;
             self.last_update = Some(Instant::now());
             true

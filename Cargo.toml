@@ -5,14 +5,10 @@ authors = ["Benedikt Reinartz <filmor@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-bytes = "0.5"
-clap = "2.33"
 get_if_addrs = "0.5"
 ipnetwork = "0.17"
 log = "0.4"
 pretty_env_logger = "0.4"
 regex = "1"
 rosc = "0.4"
-serde = { version = "1", features = ["derive"] }
 thiserror = "1"
-toml = "0.5"

@@ -3,14 +3,12 @@ mod sync;
 
 use get_if_addrs::{get_if_addrs, IfAddr, Interface};
 use ipnetwork::Ipv4Network;
-use log;
 use osc_device::OscDevice;
-use pretty_env_logger;
 use regex::{Regex, RegexSet};
 use sync::{Side, Sync};
 
 use rosc::{OscMessage, OscType};
-use std::{collections::HashMap, net::IpAddr, time::Duration};
+use std::{net::IpAddr, time::Duration};
 
 fn main() {
     if std::env::var("RUST_LOG").is_err() {
@@ -156,13 +154,25 @@ fn main() {
                 Some((value, Side::Left)) => {
                     let addr = format!("/dbaudio1/coordinatemapping/source_position_x/1/{}", n);
                     let args = vec![OscType::Float(value)];
-                    log::info!("Sending {:?}", OscMessage { addr: addr.clone(), args: args.clone() });
+                    log::info!(
+                        "Sending {:?}",
+                        OscMessage {
+                            addr: addr.clone(),
+                            args: args.clone()
+                        }
+                    );
                     ds100.send(OscMessage { addr, args });
                 }
                 Some((value, Side::Right)) => {
                     let addr = format!("/ch/{}/send/1/pan", n);
                     let args = vec![OscType::Float(value)];
-                    log::info!("Sending {:?}", OscMessage { addr: addr.clone(), args: args.clone() });
+                    log::info!(
+                        "Sending {:?}",
+                        OscMessage {
+                            addr: addr.clone(),
+                            args: args.clone()
+                        }
+                    );
                     wing.send(OscMessage { addr, args });
                 }
                 _ => {}
@@ -215,7 +225,7 @@ fn main() {
                 _ => {}
             }
         }
-        
+
         // Send new settings
         subscribe_wing(&wing);
         subscribe_ds100(&ds100);

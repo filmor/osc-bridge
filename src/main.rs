@@ -18,12 +18,12 @@ fn main() {
     let if_addrs = get_if_addrs().expect("Failed to list local network devices");
 
     let ds100_ip = IpAddr::V4(
-        "192.168.178.78"
+        "192.168.178.75"
             .parse()
             .expect("Failed to parse DS100 address"),
     );
     let wing_ip = IpAddr::V4(
-        "192.168.178.75"
+        "192.168.178.41"
             .parse()
             .expect("Failed to parse WING address"),
     );
@@ -35,12 +35,10 @@ fn main() {
 
     log::info!("Connecting to DS100...");
     let ds100 = OscDevice::new((ds100_ip, 50010), (ds100_local, 50011))
-        .expect("Failed to create UDP socket");
+        .expect("Failed to create UDP socket for DS100");
     log::info!("Connecting to WING...");
     let wing = OscDevice::new((wing_local, 2223), (wing_local, 2223))
-        .expect("Failed to create UDP socket");
-
-
+        .expect("Failed to create UDP socket for WING");
 }
 
 fn get_matching_interface(addr: IpAddr, interfaces: &Vec<Interface>) -> Option<IpAddr> {

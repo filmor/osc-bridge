@@ -41,12 +41,6 @@ impl OscDevice {
     }
 }
 
-impl Drop for OscDevice {
-    fn drop(&mut self) {
-        todo!()
-    }
-}
-
 fn create_send_thread(
     send_addr: SocketAddr,
     mut recv_addr: SocketAddr,

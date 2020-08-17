@@ -8,7 +8,18 @@ use regex::{Regex, RegexSet};
 use sync::{Side, Sync};
 
 use rosc::{OscMessage, OscType};
-use std::{net::IpAddr, time::Duration};
+use std::{net::{Ipv4Addr, IpAddr}, time::Duration};
+use structopt::StructOpt;
+
+
+#[derive(StructOpt)]
+struct Cli {
+    #[structopt(long)]
+    wing_ip: Ipv4Addr,
+    #[structopt(long)]
+    ds100_ip: Ipv4Addr,
+}
+
 
 fn main() {
     if std::env::var("RUST_LOG").is_err() {
@@ -16,18 +27,12 @@ fn main() {
     }
     pretty_env_logger::init_timed();
 
+    let args = Cli::from_args();
+
     let if_addrs = get_if_addrs().expect("Failed to list local network devices");
 
-    let ds100_ip = IpAddr::V4(
-        "192.168.178.75"
-            .parse()
-            .expect("Failed to parse DS100 address"),
-    );
-    let wing_ip = IpAddr::V4(
-        "192.168.178.41"
-            .parse()
-            .expect("Failed to parse WING address"),
-    );
+    let ds100_ip = IpAddr::V4(args.ds100_ip);
+    let wing_ip = IpAddr::V4(args.wing_ip);
 
     let ds100_local = get_matching_interface(ds100_ip, &if_addrs)
         .expect("Failed to find matching local interface");

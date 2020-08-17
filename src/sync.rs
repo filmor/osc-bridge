@@ -19,8 +19,10 @@ pub struct Sync {
     right: SyncItem,
     last_flush: Option<Instant>,
     current_master: Option<Side>,
-    // l2r: Box<dyn Fn(T) -> T>,
-    // r2l: Box<dyn Fn(T) -> T>,
+
+    // How to transform "left" to "right"
+    l2r: fn(T) -> T,
+    r2l: fn(T) -> T,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -48,12 +50,18 @@ struct SyncItem {
 
 impl Sync {
     pub fn new(name: String) -> Self {
+        Self::with_transform(name, |x| x, |x| x)
+    }
+
+    pub fn with_transform(name: String, l2r: fn(T) -> T, r2l: fn(T) -> T) -> Self {
         Sync {
             name,
             left: SyncItem::new(),
             right: SyncItem::new(),
             current_master: None,
             last_flush: None,
+            l2r,
+            r2l,
         }
     }
 
@@ -100,7 +108,7 @@ impl Sync {
 
                 if item.last_update > prev_flush {
                     // log::info!("Last update: {:?} > prev_flush {:?}, sending {} to {:?}", item.last_update, threshold, item.value, master.flip());
-                    return Some((item.value, master.flip()));
+                    return self.get_flush_result(master);
                 }
             }
             None => {
@@ -110,14 +118,13 @@ impl Sync {
                     Right
                 };
                 let item = self.get_item(side);
-                let value = item.value;
 
                 if item.last_update > prev_flush {
                     self.current_master = Some(side);
-                    return Some((value, side.flip()));
+                    return self.get_flush_result(side);
                 }
 
-                if (self.left.value - self.right.value).abs() > FORCE_SYNC_EPS {
+                if ((self.l2r)(self.left.value) - self.right.value).abs() > FORCE_SYNC_EPS {
                     let value = self.get_item(side).value;
                     self.current_master = Some(DEFAULT_MASTER);
 
@@ -129,12 +136,23 @@ impl Sync {
                         self.right.value,
                         value
                     );
-                    return Some((self.get_item(DEFAULT_MASTER).value, DEFAULT_MASTER.flip()));
+                    return self.get_flush_result(DEFAULT_MASTER);
                 }
             }
         }
 
         None
+    }
+
+    fn get_transformed(&self, side: Side) -> T {
+        match side {
+            Left => (self.l2r)(self.left.value),
+            Right => (self.r2l)(self.right.value),
+        }
+    }
+
+    fn get_flush_result(&self, side: Side) -> Option<(T, Side)> {
+        Some((self.get_transformed(side), side.flip()))
     }
 
     fn get_item(&self, side: Side) -> &SyncItem {

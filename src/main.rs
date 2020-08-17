@@ -69,13 +69,21 @@ fn main() {
     for i in 1..=40 {
         x_positions.push(Sync::new(format!("x{:02}", i)));
         y_positions.push(Sync::new(format!("y{:02}", i)));
-        gains.push(Sync::new(format!("g{:02}", i)));
+        gains.push(Sync::with_transform(
+            format!("g{:02}", i),
+            gain_ds100_to_wing,
+            gain_wing_to_ds100,
+        ));
     }
 
     let mut reverb_gains = Vec::new();
 
     for i in 1..=4 {
-        reverb_gains.push(Sync::new(format!("rg{}", i)));
+        reverb_gains.push(Sync::with_transform(
+            format!("rg{}", i),
+            gain_ds100_to_wing,
+            gain_wing_to_ds100,
+        ));
     }
 
     subscribe_wing(&wing);
@@ -319,5 +327,21 @@ fn subscribe_wing(device: &OscDevice) {
     for i in 1..=4 {
         let addr = format!("/bus/{}/fdr", i);
         device.send(empty_msg(addr));
+    }
+}
+
+fn gain_wing_to_ds100(val: f32) -> f32 {
+    if val > 0.0 {
+        val / 10.0 * 24.0
+    } else {
+        val / 144.0 * 120.0
+    }
+}
+
+fn gain_ds100_to_wing(val: f32) -> f32 {
+    if val > 0.0 {
+        val / 24.0 * 10.0
+    } else {
+        val / 120.0 * 140.0
     }
 }

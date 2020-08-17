@@ -14,12 +14,16 @@ use std::{
 };
 use structopt::StructOpt;
 
+const MAIN_DELTA: Duration = Duration::from_millis(100);
+
 #[derive(StructOpt)]
 struct Cli {
     #[structopt(long)]
     wing_ip: Ipv4Addr,
     #[structopt(long)]
     ds100_ip: Ipv4Addr,
+    #[structopt(long)]
+    monitor: Vec<i32>,
 }
 
 fn main() {
@@ -78,7 +82,7 @@ fn main() {
     subscribe_ds100(&ds100);
 
     loop {
-        std::thread::sleep(Duration::from_millis(100));
+        std::thread::sleep(MAIN_DELTA);
 
         for msg in ds100.flush() {
             log::debug!("Got DS100 message {:?}", msg);
@@ -154,14 +158,21 @@ fn main() {
             }
         }
 
-        log::info!(
-            "DS100: ({}, {})\tWING: ({}, {})\tMaster: {:?}",
-            x_positions[0].left_value() as i32,
-            y_positions[0].left_value() as i32,
-            x_positions[0].right_value() as i32,
-            y_positions[0].right_value() as i32,
-            x_positions[0].current_master(),
-        );
+        for i in args.monitor.iter() {
+            let n: usize = *i as usize - 1;
+            let ref x_sync = x_positions[n];
+            let ref y_sync = y_positions[n];
+            log::info!(
+                "Channel {}:\tDS100 ({}, {})\tWING ({}, {})\tMaster: {:?}, {:?}",
+                n,
+                x_sync.left_value() as i32,
+                y_sync.left_value() as i32,
+                x_sync.right_value() as i32,
+                y_sync.right_value() as i32,
+                x_sync.current_master(),
+                y_sync.current_master(),
+            );
+        }
 
         for i in 0..40 {
             let n = i + 1;

@@ -64,6 +64,10 @@ impl Sync {
         }
     }
 
+    // pub fn last_update(&self) -> Option<Instant> {
+    //     self.left.last_update.max(self.right.last_update)
+    // }
+
     pub fn left_value(&self) -> T {
         self.left.value
     }

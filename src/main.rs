@@ -8,9 +8,11 @@ use regex::{Regex, RegexSet};
 use sync::{Side, Sync};
 
 use rosc::{OscMessage, OscType};
-use std::{net::{Ipv4Addr, IpAddr}, time::Duration};
+use std::{
+    net::{IpAddr, Ipv4Addr},
+    time::Duration,
+};
 use structopt::StructOpt;
-
 
 #[derive(StructOpt)]
 struct Cli {
@@ -19,7 +21,6 @@ struct Cli {
     #[structopt(long)]
     ds100_ip: Ipv4Addr,
 }
-
 
 fn main() {
     if std::env::var("RUST_LOG").is_err() {
@@ -57,11 +58,21 @@ fn main() {
 
     let wing_bus_regex = Regex::new(r"^/bus/(\d+)/fdr$").unwrap();
 
-    let mut x_positions = vec![Sync::new(); 40];
-    let mut y_positions = vec![Sync::new(); 40];
-    let mut gains = vec![Sync::new(); 40];
+    let mut x_positions = Vec::new();
+    let mut y_positions = Vec::new();
+    let mut gains = Vec::new();
 
-    let mut reverb_gains = vec![Sync::new(); 40];
+    for i in 1..=40 {
+        x_positions.push(Sync::new(format!("x{:02}", i)));
+        y_positions.push(Sync::new(format!("y{:02}", i)));
+        gains.push(Sync::new(format!("g{:02}", i)));
+    }
+
+    let mut reverb_gains = Vec::new();
+
+    for i in 1..=4 {
+        reverb_gains.push(Sync::new(format!("rg{}", i)));
+    }
 
     subscribe_wing(&wing);
     subscribe_ds100(&ds100);

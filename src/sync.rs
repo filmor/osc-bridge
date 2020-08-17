@@ -1,9 +1,20 @@
 use std::time::{Duration, Instant};
 
 type T = f32;
+const EPS: f32 = 0.01;
+
+// If the difference is larger than this value, we force a synchronisation
+const FORCE_SYNC_EPS: f32 = 1.0;
+
+// How long does the current side count as master?
+const MASTER_DURATION: Duration = Duration::from_millis(250);
+
+// Who wins if there is a discrepancy (incomplete update)?
+const DEFAULT_MASTER: Side = Side::Right;
 
 #[derive(Clone)]
 pub struct Sync {
+    name: String,
     left: SyncItem,
     right: SyncItem,
     last_flush: Option<Instant>,
@@ -36,8 +47,9 @@ struct SyncItem {
 }
 
 impl Sync {
-    pub fn new() -> Self {
+    pub fn new(name: String) -> Self {
         Sync {
+            name,
             left: SyncItem::new(),
             right: SyncItem::new(),
             current_master: None,
@@ -65,9 +77,10 @@ impl Sync {
     }
 
     pub fn flush(&mut self) -> Option<(T, Side)> {
-        let prev_flush = self.last_flush;
         let now = Instant::now();
-        let threshold = now - Duration::from_millis(250);
+        let threshold = now - MASTER_DURATION;
+
+        let prev_flush = self.last_flush;
         self.last_flush = Some(now);
 
         match self.current_master {
@@ -99,6 +112,21 @@ impl Sync {
                     self.current_master = Some(side);
                     return Some((value, side.flip()));
                 }
+
+                if (self.left.value - self.right.value).abs() > FORCE_SYNC_EPS {
+                    let value = self.get_item(side).value;
+                    self.current_master = Some(DEFAULT_MASTER);
+
+                    log::warn!(
+                        "Force synchronising {} to {:?}: ({}, {}) => {}",
+                        self.name,
+                        DEFAULT_MASTER,
+                        self.left.value,
+                        self.right.value,
+                        value
+                    );
+                    return Some((self.get_item(DEFAULT_MASTER).value, DEFAULT_MASTER.flip()));
+                }
             }
         }
 
@@ -122,7 +150,7 @@ impl SyncItem {
     }
 
     fn update(&mut self, new_value: T) -> bool {
-        if (self.value - new_value).abs() > 0.01 {
+        if (self.value - new_value).abs() > EPS {
             self.value = new_value;
             self.last_update = Some(Instant::now());
             true

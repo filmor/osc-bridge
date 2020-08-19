@@ -346,6 +346,6 @@ fn gain_ds100_to_wing(val: f32) -> f32 {
     if val > 0.0 {
         val / 24.0 * 10.0
     } else {
-        val / 120.0 * 140.0
+        val / 120.0 * 144.0
     }
 }

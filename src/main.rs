@@ -170,15 +170,19 @@ fn main() {
             let n: usize = *i as usize - 1;
             let ref x_sync = x_positions[n];
             let ref y_sync = y_positions[n];
+            let ref gain = gains[n];
             log::info!(
-                "Channel {}:\tDS100 ({}, {})\tWING ({}, {})\tMaster: {:?}, {:?}",
+                "Channel {}:\tDS100 ({}, {}) @ {}\tWING ({}, {}) @ {}\tMaster: {:?}, {:?}, {:?}",
                 n,
                 x_sync.left_value() as i32,
                 y_sync.left_value() as i32,
+                gain.left_value() as i32,
                 x_sync.right_value() as i32,
                 y_sync.right_value() as i32,
+                gain.right_value() as i32,
                 x_sync.current_master(),
                 y_sync.current_master(),
+                gain.current_master()
             );
         }
 

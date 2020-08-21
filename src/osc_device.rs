@@ -19,13 +19,16 @@ pub struct OscDevice {
 
 impl OscDevice {
     pub fn new(
+        name: &str,
         send_addr: impl Into<SocketAddr>,
         recv_addr: impl Into<SocketAddr>,
     ) -> Result<Self, OscDeviceError> {
         let send_addr = send_addr.into();
         let recv_addr = recv_addr.into();
 
-        let (handle, send, recv) = create_thread(send_addr, recv_addr)?;
+        let name = name.to_owned();
+
+        let (handle, send, recv) = create_thread(name.clone(), send_addr, recv_addr)?;
 
         Ok(OscDevice {
             _thread: handle,
@@ -44,6 +47,7 @@ impl OscDevice {
 }
 
 fn create_thread(
+    name: String,
     send_addr: SocketAddr,
     recv_addr: SocketAddr,
 ) -> Result<(JoinHandle<()>, Sender<OscMessage>, Receiver<OscMessage>), OscDeviceError> {
@@ -61,7 +65,7 @@ fn create_thread(
 
         loop {
             while let Ok(len) = sock.recv(&mut buf) {
-                if !handle_receive(&buf[..len], &tx_recv) {
+                if !handle_receive(&name, &buf[..len], &tx_recv) {
                     break;
                 };
             }
@@ -73,7 +77,7 @@ fn create_thread(
             } */
             for msg in rx_send.try_iter() {
                 log::debug!("Sending message {:?}", msg);
-                handle_send(&sock, msg);
+                handle_send(&name, &sock, msg);
             }
 
             std::thread::sleep(Duration::from_millis(1));
@@ -83,7 +87,7 @@ fn create_thread(
     Ok((thr, tx_send, rx_recv))
 }
 
-fn handle_receive(buf: &[u8], tx: &Sender<OscMessage>) -> bool {
+fn handle_receive(name: &str, buf: &[u8], tx: &Sender<OscMessage>) -> bool {
     match decode(buf) {
         Ok(OscPacket::Message(msg)) => {
             if tx.send(msg).is_err() {
@@ -93,21 +97,21 @@ fn handle_receive(buf: &[u8], tx: &Sender<OscMessage>) -> bool {
         }
         Ok(OscPacket::Bundle(bdl)) => log::error!("Received unexpected bundle: {:?}", bdl),
         Err(err) => {
-            log::error!("Failed to decode packet: {:?}", err);
+            log::error!("[{}] Failed to decode packet: {:?}", name, err);
         }
     }
 
     true
 }
 
-fn handle_send(sock: &UdpSocket, msg: OscMessage) {
+fn handle_send(name: &str, sock: &UdpSocket, msg: OscMessage) {
     match encode(&OscPacket::Message(msg)) {
         Ok(out) => {
             // TODO: log an error
             sock.send(&out).unwrap();
         }
         Err(err) => {
-            log::error!("Failed to encode packet: {:?}", err);
+            log::error!("[{}] Failed to encode packet: {:?}", name, err);
         }
     }
 }

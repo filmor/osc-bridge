@@ -45,10 +45,10 @@ fn main() {
         .expect("Failed to find matching local interface");
 
     log::info!("Connecting to DS100...");
-    let ds100 = OscDevice::new((ds100_ip, 50010), (ds100_local, 50011))
+    let ds100 = OscDevice::new("DS100", (ds100_ip, 50010), (ds100_local, 50011))
         .expect("Failed to create UDP socket for DS100");
     log::info!("Connecting to WING...");
-    let wing = OscDevice::new((wing_ip, 2223), (wing_local, 0))
+    let wing = OscDevice::new("WING", (wing_ip, 2223), (wing_local, 0))
         .expect("Failed to create UDP socket for WING");
 
     let ds100_regex_set = RegexSet::new(&[

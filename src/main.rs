@@ -1,5 +1,7 @@
 mod osc_device;
 mod sync;
+mod config;
+mod bridge;
 
 use get_if_addrs::{get_if_addrs, IfAddr, Interface};
 use ipnetwork::Ipv4Network;
@@ -8,10 +10,7 @@ use regex::{Regex, RegexSet};
 use sync::{Side, Sync};
 
 use rosc::{OscMessage, OscType};
-use std::{
-    net::{IpAddr, Ipv4Addr},
-    time::Duration,
-};
+use std::{net::{IpAddr, Ipv4Addr}, path::{Path, PathBuf}, time::Duration};
 use structopt::StructOpt;
 
 const MAIN_DELTA: Duration = Duration::from_millis(100);
@@ -19,9 +18,11 @@ const MAIN_DELTA: Duration = Duration::from_millis(100);
 #[derive(StructOpt)]
 struct Cli {
     #[structopt(long)]
-    wing_ip: Ipv4Addr,
+    config: String,
     #[structopt(long)]
-    ds100_ip: Ipv4Addr,
+    wing_ip: Option<Ipv4Addr>,
+    #[structopt(long)]
+    ds100_ip: Option<Ipv4Addr>,
     #[structopt(long)]
     monitor: Vec<i32>,
 }
@@ -34,10 +35,12 @@ fn main() {
 
     let args = Cli::from_args();
 
+    let cfg = config::Config::load(Path::new(&args.config)).unwrap();
+
     let if_addrs = get_if_addrs().expect("Failed to list local network devices");
 
-    let ds100_ip = IpAddr::V4(args.ds100_ip);
-    let wing_ip = IpAddr::V4(args.wing_ip);
+    let ds100_ip = IpAddr::V4(args.ds100_ip.unwrap());
+    let wing_ip = IpAddr::V4(args.wing_ip.unwrap());
 
     let ds100_local = get_matching_interface(ds100_ip, &if_addrs)
         .expect("Failed to find matching local interface");

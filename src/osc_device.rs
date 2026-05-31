@@ -1,8 +1,8 @@
-use rosc::{decoder::decode_udp as decode, encoder::encode, OscMessage, OscPacket};
+use rosc::{OscMessage, OscPacket, decoder::decode_udp as decode, encoder::encode};
 use std::{
     io,
     net::{SocketAddr, UdpSocket},
-    sync::mpsc::{channel, Receiver, Sender},
+    sync::mpsc::{Receiver, Sender, channel},
     thread,
     time::Duration,
 };
@@ -28,13 +28,7 @@ impl OscDevice {
 
         let name = name.to_owned();
 
-        let (handle, send, recv) = create_thread(name.clone(), send_addr, recv_addr)?;
-
-        Ok(OscDevice {
-            _thread: handle,
-            send,
-            recv,
-        })
+        create_thread(name.clone(), send_addr, recv_addr)
     }
 
     pub fn send(&self, msg: OscMessage) {
@@ -50,7 +44,7 @@ fn create_thread(
     name: String,
     send_addr: SocketAddr,
     recv_addr: SocketAddr,
-) -> Result<(JoinHandle<()>, Sender<OscMessage>, Receiver<OscMessage>), OscDeviceError> {
+) -> Result<OscDevice, OscDeviceError> {
     let sock = UdpSocket::bind(recv_addr)?;
     sock.connect(send_addr)?;
     sock.set_read_timeout(Some(Duration::from_millis(1)))?;
@@ -84,7 +78,11 @@ fn create_thread(
         }
     });
 
-    Ok((thr, tx_send, rx_recv))
+    Ok(OscDevice {
+        _thread: thr,
+        send: tx_send,
+        recv: rx_recv,
+    })
 }
 
 fn handle_receive(name: &str, buf: &[u8], tx: &Sender<OscMessage>) -> bool {

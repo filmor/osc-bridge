@@ -1,7 +1,7 @@
 mod osc_device;
 mod sync;
 
-use get_if_addrs::{get_if_addrs, IfAddr, Interface};
+use get_if_addrs::{IfAddr, Interface, get_if_addrs};
 use ipnetwork::Ipv4Network;
 use osc_device::OscDevice;
 use regex::{Regex, RegexSet};
@@ -52,7 +52,7 @@ fn main() {
     let wing = OscDevice::new("WING", (wing_ip, 2223), (wing_local, 0))
         .expect("Failed to create UDP socket for WING");
 
-    let ds100_regex_set = RegexSet::new(&[
+    let ds100_regex_set = RegexSet::new([
         r"^/dbaudio1/coordinatemapping/source_position_xy/1/",
         r"^/dbaudio1/matrixinput/reverbsendgain/",
         r"^/dbaudio1/reverbinputprocessing/gain/",
@@ -169,9 +169,9 @@ fn main() {
 
         for i in args.monitor.iter() {
             let n: usize = *i as usize - 1;
-            let ref x_sync = x_positions[n];
-            let ref y_sync = y_positions[n];
-            let ref gain = gains[n];
+            let x_sync = &x_positions[n];
+            let y_sync = &y_positions[n];
+            let gain = &gains[n];
             log::info!(
                 "Channel {}:\tDS100 ({}, {}) @ {}\tWING ({}, {}) @ {}\tMaster: {:?}, {:?}, {:?}",
                 n,
@@ -249,11 +249,11 @@ fn main() {
             }
         }
 
-        for i in 0..4 {
+        for (i, reverb_gain) in reverb_gains.iter_mut().take(4).enumerate() {
             let n = i + 1;
-            match reverb_gains[i].flush() {
+            match reverb_gain.flush() {
                 Some((value, Side::Left)) => {
-                    let addr = format!("/dbaudio1/reverbinputprocessing/gain/{}", n);
+                    let addr = format!("/dbaudio1/reverbinputprocessing/gain/{n}");
                     let args = vec![OscType::Float(value)];
                     ds100.send(OscMessage { addr, args });
                 }
@@ -272,22 +272,21 @@ fn main() {
     }
 }
 
-fn get_matching_interface(addr: IpAddr, interfaces: &Vec<Interface>) -> Option<IpAddr> {
+fn get_matching_interface(addr: IpAddr, interfaces: &[Interface]) -> Option<IpAddr> {
     match addr {
         IpAddr::V4(addr) => {
             for interface in interfaces.iter() {
-                if let IfAddr::V4(ref if_addr) = interface.addr {
-                    if let Ok(net) = Ipv4Network::with_netmask(if_addr.ip, if_addr.netmask) {
-                        if net.contains(addr) {
-                            log::info!(
-                                "Using device '{}' ({}) to connect to {}",
-                                interface.name,
-                                if_addr.ip,
-                                addr
-                            );
-                            return Some(IpAddr::V4(if_addr.ip));
-                        }
-                    }
+                if let IfAddr::V4(ref if_addr) = interface.addr
+                    && let Ok(net) = Ipv4Network::with_netmask(if_addr.ip, if_addr.netmask)
+                    && net.contains(addr)
+                {
+                    log::info!(
+                        "Using device '{}' ({}) to connect to {}",
+                        interface.name,
+                        if_addr.ip,
+                        addr
+                    );
+                    return Some(IpAddr::V4(if_addr.ip));
                 }
             }
         }

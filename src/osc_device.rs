@@ -1,4 +1,4 @@
-use rosc::{decoder::decode, encoder::encode, OscMessage, OscPacket};
+use rosc::{decoder::decode_udp as decode, encoder::encode, OscMessage, OscPacket};
 use std::{
     io,
     net::{SocketAddr, UdpSocket},
@@ -89,15 +89,17 @@ fn create_thread(
 
 fn handle_receive(name: &str, buf: &[u8], tx: &Sender<OscMessage>) -> bool {
     match decode(buf) {
-        Ok(OscPacket::Message(msg)) => {
+        Ok((_, OscPacket::Message(msg))) => {
             if tx.send(msg).is_err() {
                 log::info!("Failed to forward message, stopping thread");
                 return false;
             }
         }
-        Ok(OscPacket::Bundle(bdl)) => log::error!("Received unexpected bundle: {:?}", bdl),
+        Ok((_, OscPacket::Bundle(bdl))) => {
+            log::error!("Received unexpected bundle: {bdl:?}");
+        }
         Err(err) => {
-            log::error!("[{}] Failed to decode packet: {:?}", name, err);
+            log::error!("[{name}] Failed to decode packet: {err:?}");
         }
     }
 

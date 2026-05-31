@@ -28,7 +28,8 @@ struct Cli {
 
 fn main() {
     if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "info");
+        // Only happens in single threaded code
+        unsafe { std::env::set_var("RUST_LOG", "info") };
     }
     pretty_env_logger::init_timed();
 

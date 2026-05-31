@@ -2,7 +2,7 @@
 name = "osc-bridge"
 version = "0.1.0"
 authors = ["Benedikt Reinartz <filmor@gmail.com>"]
-edition = "2018"
+edition = "2024"
 
 [dependencies]
 get_if_addrs = "0.5"
